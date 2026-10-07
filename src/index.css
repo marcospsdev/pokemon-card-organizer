@@ -1,0 +1,174 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --color-dex-50: #fff1f2;
+  --color-dex-100: #ffe0e3;
+  --color-dex-200: #ffc5cb;
+  --color-dex-400: #f2465e;
+  --color-dex-500: #dc0a2d;
+  --color-dex-600: #b8081f;
+  --color-dex-700: #8f0a1c;
+  --color-dex-800: #6b0a17;
+
+  --color-ink-950: #0b0c10;
+  --color-ink-900: #111318;
+  --color-ink-800: #1c1f26;
+  --color-ink-700: #2a2e37;
+  --color-ink-600: #444a56;
+  --color-ink-500: #6b7280;
+  --color-ink-400: #9aa1ad;
+  --color-ink-300: #c7ccd4;
+  --color-ink-200: #e3e6eb;
+  --color-ink-100: #eff1f4;
+  --color-ink-50: #f7f8fa;
+
+  --color-lens-300: #8ec5ff;
+  --color-lens-400: #5aa6ff;
+  --color-lens-500: #2f7cf6;
+  --color-lens-600: #1d5fd1;
+
+  --color-volt-400: #ffd84d;
+  --color-volt-500: #ffcb05;
+
+  --color-felt-700: #2c3a4f;
+  --color-felt-800: #223044;
+  --color-felt-900: #19243a;
+
+  --radius-card: 14px;
+  --radius-sheet: 28px;
+
+  --shadow-card: 0 1px 2px rgb(17 19 24 / 0.06), 0 6px 18px -6px rgb(17 19 24 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(17 19 24 / 0.08), 0 18px 40px -12px rgb(17 19 24 / 0.35);
+  --shadow-soft: 0 1px 1px rgb(17 19 24 / 0.04), 0 2px 10px -2px rgb(17 19 24 / 0.08);
+
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 font-sans antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  :focus-visible {
+    outline: 2.5px solid var(--color-lens-500);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pixelated {
+    image-rendering: pixelated;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .backface-hidden {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  .glass {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  .glass-dark {
+    background: rgb(17 19 24 / 0.62);
+    backdrop-filter: saturate(160%) blur(18px);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+  }
+
+  .felt {
+    background-color: var(--color-felt-800);
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.09), transparent 60%),
+      radial-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px);
+    background-size: 100% 100%, 6px 6px;
+  }
+}
+
+.draggable-mirror {
+  z-index: 60;
+  pointer-events: none;
+}
+
+.draggable-mirror .sortable-face {
+  transform: rotate(-4deg) scale(1.08);
+  box-shadow: var(--shadow-lift);
+  transition: transform 160ms var(--ease-spring);
+}
+
+.draggable-source--is-dragging .sortable-face {
+  opacity: 0.25;
+  outline: 2px dashed rgb(255 255 255 / 0.5);
+  outline-offset: -2px;
+}
+
+@keyframes scan-sweep {
+  0% {
+    top: 4%;
+  }
+  50% {
+    top: 92%;
+  }
+  100% {
+    top: 4%;
+  }
+}
+
+.scan-line {
+  animation: scan-sweep 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-line {
+    animation: none;
+    top: 50%;
+  }
+
+  .draggable-mirror .sortable-face {
+    transform: none;
+  }
+}
