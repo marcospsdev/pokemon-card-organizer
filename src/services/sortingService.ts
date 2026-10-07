@@ -97,8 +97,39 @@ export function tableSlot(position: number, columns: number): TableSlot {
   return { row: Math.floor(position / columns) + 1, column: (position % columns) + 1 }
 }
 
-export function nextGroupIndex(groups: SortGroup[]) {
-  return groups.findIndex((group) => !group.done)
+export interface DeckCard {
+  card: ScannedCard
+  deckIndex: number
+  placed: boolean
+}
+
+export function buildDeck(cards: ScannedCard[], placed: Record<number, number> = {}): DeckCard[] {
+  const seen = new Map<number, number>()
+  return cards.map((card, deckIndex) => {
+    const occurrence = seen.get(card.pokedexNumber) ?? 0
+    seen.set(card.pokedexNumber, occurrence + 1)
+    return { card, deckIndex, placed: occurrence < (placed[card.pokedexNumber] ?? 0) }
+  })
+}
+
+export function nextDeckIndex(deck: DeckCard[]) {
+  return deck.findIndex((item) => !item.placed)
+}
+
+export function lastPlacedDeckIndex(deck: DeckCard[]) {
+  return deck.findLastIndex((item) => item.placed)
+}
+
+export interface DexRangeItem {
+  pokedexNumber: number
+  group: SortGroup | null
+}
+
+export function dexRange(groups: SortGroup[], from: number, to: number): DexRangeItem[] {
+  const byDex = new Map(groups.map((group) => [group.pokedexNumber, group]))
+  const items: DexRangeItem[] = []
+  for (let dex = from; dex <= to; dex++) items.push({ pokedexNumber: dex, group: byDex.get(dex) ?? null })
+  return items
 }
 
 function label(group: SortGroup) {
@@ -113,13 +144,12 @@ export function instructionFor(groups: SortGroup[], index: number, columns: numb
   const next = groups.slice(index + 1).find((item) => item.placed > 0) ?? null
   const slot = tableSlot(group.position, columns)
   const startsNewRow = slot.column === 1 && slot.row > 1
-  const remaining = group.count - group.placed
 
   let kind: InstructionKind
   let headline: string
   if (group.placed > 0) {
     kind = 'stack'
-    headline = `Junte ${pluralize(remaining, 'carta', 'cartas')} à pilha de ${group.name}.`
+    headline = `Junte à pilha de ${group.name}.`
   } else if (previous && next) {
     kind = 'between'
     headline = `Coloque entre ${previous.name} e ${next.name}.`
@@ -131,16 +161,18 @@ export function instructionFor(groups: SortGroup[], index: number, columns: numb
     headline = `Coloque antes de ${next.name}.`
   } else {
     kind = 'first'
-    headline = 'Comece aqui: coloque esta carta no canto superior esquerdo da mesa.'
+    headline = `Primeira carta da mesa: fileira ${slot.row}, posição ${slot.column}.`
   }
 
   let detail: string | null = null
-  if (group.count > 1 && group.placed === 0) {
-    detail = `Você possui ${group.count} cartas. Coloque as ${group.count} juntas neste local.`
+  if (kind === 'stack') {
+    detail = `Carta ${group.placed + 1} de ${group.count} deste Pokémon.`
+  } else if (kind === 'first' && group.position > 0) {
+    detail = `Deixe ${pluralize(group.position, 'espaço livre', 'espaços livres')} antes dela para os Pokémon que vêm antes na Pokédex.`
+  } else if (group.count > 1) {
+    detail = `Você tem ${group.count} cartas de ${group.name}. As próximas vão para esta mesma pilha.`
   } else if (kind === 'between' && previous && next) {
     detail = `Abra espaço entre ${label(previous)} e ${label(next)}.`
-  } else if (startsNewRow && kind === 'after') {
-    detail = 'Comece uma nova fileira logo abaixo.'
   }
 
   return { group, kind, previous, next, slot, headline, detail, startsNewRow }

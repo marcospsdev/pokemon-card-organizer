@@ -8,6 +8,7 @@ import { useOrganization } from '@/store/organizationsStore'
 import { useUiStore } from '@/store/uiStore'
 import { Button } from '@/components/ui/Button'
 import { PokemonCard } from '@/components/pokemon/PokemonCard'
+import { DexRangeGrid } from '@/components/sorting/DexRangeGrid'
 
 const MAX_CARDS = 18
 
@@ -16,7 +17,7 @@ export function CompletedPage() {
   const navigate = useNavigate()
   const organization = useOrganization(id)
   const groups = useSortPlan(id)
-  const { byId } = usePokemonIndex()
+  const { byId, list } = usePokemonIndex()
   const openNew = useUiStore((state) => state.openNewOrganization)
   const reduceMotion = useReducedMotion()
 
@@ -85,6 +86,10 @@ export function CompletedPage() {
         </div>
 
         <p className='max-w-xs text-[17px] leading-snug text-white/85'>Sua coleção agora está organizada pela Pokédex.</p>
+
+        <div className='mt-10 w-full rounded-[28px] bg-black/15 p-4 ring-1 ring-white/10 sm:p-6'>
+          <DexRangeGrid groups={groups} pokemonById={byId} totalSpecies={list.length} />
+        </div>
 
         <div className='mt-auto flex w-full max-w-sm flex-col gap-2.5 pt-10'>
           <Button variant='secondary' size='lg' block className='text-dex-600 ring-0' onClick={() => navigate('/pokedex')} icon={<BookOpen className='h-5 w-5' />}>

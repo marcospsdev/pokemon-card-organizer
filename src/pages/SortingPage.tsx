@@ -3,7 +3,7 @@ import { LayoutGroup } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { usePokemonIndex, useSortPlan } from '@/hooks/usePokemonData'
-import { instructionFor, nextGroupIndex, summarize } from '@/services/sortingService'
+import { buildDeck, instructionFor, lastPlacedDeckIndex, nextDeckIndex, summarize } from '@/services/sortingService'
 import { useSettingsStore, vibrate } from '@/store/settingsStore'
 import { useOrganization, useOrganizationsStore } from '@/store/organizationsStore'
 import { Button, IconButton } from '@/components/ui/Button'
@@ -26,10 +26,12 @@ export function SortingPage() {
   const columns = useSettingsStore((state) => state.tableColumns)
   const setColumns = useSettingsStore((state) => state.setTableColumns)
   const [view, setView] = useState<View>('guided')
-  const [history, setHistory] = useState<Array<{ dex: number; previous: number }>>([])
 
   const summary = useMemo(() => summarize(groups), [groups])
-  const currentIndex = nextGroupIndex(groups)
+  const deck = useMemo(() => (organization ? buildDeck(organization.cards, organization.placed) : []), [organization])
+  const deckIndex = nextDeckIndex(deck)
+  const currentCard = deck[deckIndex]?.card
+  const currentIndex = currentCard ? groups.findIndex((group) => group.pokedexNumber === currentCard.pokedexNumber) : -1
   const instruction = currentIndex >= 0 ? instructionFor(groups, currentIndex, columns) : null
 
   useEffect(() => {
@@ -37,11 +39,11 @@ export function SortingPage() {
   }, [id, setActive])
 
   useEffect(() => {
-    if (id && groups.length > 0 && currentIndex === -1) {
+    if (id && deck.length > 0 && deckIndex === -1) {
       const timer = window.setTimeout(() => navigate(`/organizations/${id}/done`, { replace: true }), 650)
       return () => window.clearTimeout(timer)
     }
-  }, [id, groups.length, currentIndex, navigate])
+  }, [id, deck.length, deckIndex, navigate])
 
   if (!organization || !id) return <Navigate to='/organizations' replace />
   if (groups.length === 0) return <Navigate to={`/organizations/${id}`} replace />
@@ -49,23 +51,18 @@ export function SortingPage() {
   const placeCurrent = () => {
     if (!instruction) return
     const { group } = instruction
-    setHistory((current) => [...current, { dex: group.pokedexNumber, previous: group.placed }])
-    setPlaced(id, group.pokedexNumber, group.count)
+    setPlaced(id, group.pokedexNumber, group.placed + 1)
     vibrate(14)
   }
 
   const undo = () => {
-    const last = history.at(-1)
-    if (last) {
-      setPlaced(id, last.dex, last.previous)
-      setHistory((current) => current.slice(0, -1))
-      return
-    }
-    const previousDone = groups.slice(0, Math.max(0, currentIndex)).reverse().find((group) => group.done) ?? groups.findLast((group) => group.done)
-    if (previousDone) setPlaced(id, previousDone.pokedexNumber, 0)
+    const last = deck[lastPlacedDeckIndex(deck)]
+    if (!last) return
+    const dex = last.card.pokedexNumber
+    setPlaced(id, dex, (organization.placed[dex] ?? 1) - 1)
   }
 
-  const canUndo = history.length > 0 || summary.placedCards > 0
+  const canUndo = summary.placedCards > 0
 
   return (
     <div className='fixed inset-0 z-40 flex flex-col bg-ink-900 text-white'>
@@ -102,7 +99,12 @@ export function SortingPage() {
           <div className='flex min-h-0 flex-1 flex-col gap-4 px-4 lg:mx-auto lg:w-full lg:max-w-5xl lg:flex-row lg:gap-8'>
             <section className='shrink-0 lg:w-[420px] lg:pt-6' aria-label='Próxima carta'>
               {instruction ? (
-                <SortingInstruction instruction={instruction} types={byId.get(instruction.group.pokemonId)?.types} />
+                <SortingInstruction
+                  instruction={instruction}
+                  deckPosition={deckIndex + 1}
+                  deckSize={deck.length}
+                  types={byId.get(instruction.group.pokemonId)?.types}
+                />
               ) : (
                 <div className='flex h-[190px] items-center justify-center text-[20px] font-bold'>Tudo no lugar!</div>
               )}
@@ -138,7 +140,7 @@ export function SortingPage() {
         </LayoutGroup>
       ) : (
         <div className='min-h-0 flex-1 overflow-y-auto px-4 pb-4 lg:mx-auto lg:w-full lg:max-w-5xl'>
-          <SequenceView groups={groups} currentIndex={currentIndex} />
+          <SequenceView groups={groups} deck={deck} deckIndex={deckIndex} />
         </div>
       )}
 
@@ -147,9 +149,7 @@ export function SortingPage() {
           <span className='hidden sm:inline'>Desfazer</span>
         </Button>
         <Button size='lg' block className='lg:w-[360px] lg:flex-none' onClick={placeCurrent} disabled={!instruction} icon={<Check className='h-5 w-5' strokeWidth={2.6} />}>
-          {instruction && instruction.group.count - instruction.group.placed > 1
-            ? `Coloquei as ${instruction.group.count - instruction.group.placed}`
-            : 'Coloquei · Próxima'}
+          Coloquei · Próxima
         </Button>
       </footer>
     </div>

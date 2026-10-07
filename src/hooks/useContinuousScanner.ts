@@ -4,16 +4,27 @@ import { ocrService } from '@/services/ocrService'
 import type { PokemonRecognitionService } from '@/services/pokemonRecognitionService'
 import type { MatchCandidate, Pokemon, ScannerState } from '@/types'
 
-const STILL_SCENE_DISTANCE = 0.22
-const SAME_CARD_DISTANCE = 0.55
-const MISSES_TO_RELEASE = 2
+const REMOVAL_DISTANCE = 0.5
+const REMOVAL_FRAMES = 3
+const MIN_LOCK_MS = 1400
 const IDENTIFIED_HOLD_MS = 1400
 const LOOP_INTERVAL_MS = 220
+const LOCKED_POLL_MS = 150
+const REPEAT_WINDOW_MS = 5000
 
 interface CardLock {
   signature: Float32Array
-  misses: number
+  pokemonId: number | null
+  lockedAt: number
+  changedFrames: number
 }
+
+interface ReleasedCard {
+  pokemonId: number
+  releasedAt: number
+}
+
+export type ConfirmationReason = 'uncertain' | 'repeat'
 
 interface Options {
   videoRef: RefObject<HTMLVideoElement | null>
@@ -29,12 +40,14 @@ const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve,
 export function useContinuousScanner({ videoRef, guideRef, active, recognition, thresholds, onIdentified }: Options) {
   const [state, setState] = useState<ScannerState>('idle')
   const [candidates, setCandidates] = useState<MatchCandidate[]>([])
+  const [confirmationReason, setConfirmationReason] = useState<ConfirmationReason>('uncertain')
   const [engineProgress, setEngineProgress] = useState(0)
   const [engineReady, setEngineReady] = useState(false)
   const [engineError, setEngineError] = useState(false)
   const [lastText, setLastText] = useState('')
 
   const lockRef = useRef<CardLock | null>(null)
+  const releasedRef = useRef<ReleasedCard | null>(null)
   const pausedRef = useRef(false)
   const userPausedRef = useRef(false)
   const holdUntilRef = useRef(0)
@@ -83,32 +96,35 @@ export function useContinuousScanner({ videoRef, guideRef, active, recognition, 
     const handleResult = (result: Awaited<ReturnType<PokemonRecognitionService['recognize']>>, signature: Float32Array) => {
       const { auto, minimum } = thresholdsRef.current
       const [top] = result.candidates
-      const lock = lockRef.current
 
       if (!top || top.score < minimum) {
-        if (lock) {
-          lock.misses++
-          if (lock.misses >= MISSES_TO_RELEASE) lockRef.current = null
-        }
-        setPhase(lockRef.current ? 'scanning-next' : 'scanning')
+        setPhase('scanning')
         return
       }
 
-      if (lock && signatureDistance(lock.signature, signature) < SAME_CARD_DISTANCE) {
-        lock.misses = 0
-        lock.signature = signature
-        setPhase('scanning-next')
-        return
-      }
+      lockRef.current = { signature, pokemonId: top.pokemon.id, lockedAt: Date.now(), changedFrames: 0 }
+      const released = releasedRef.current
+      const repeated = released !== null && released.pokemonId === top.pokemon.id && Date.now() - released.releasedAt < REPEAT_WINDOW_MS
 
-      lockRef.current = { signature, misses: 0 }
-      if (result.confidence >= auto) {
+      if (result.confidence >= auto && !repeated) {
         identify(top.pokemon, result.confidence)
         return
       }
       pausedRef.current = true
+      setConfirmationReason(repeated ? 'repeat' : 'uncertain')
       setCandidates(result.candidates)
       setPhase('confirmation')
+    }
+
+    const watchRemoval = (lock: CardLock, signature: Float32Array) => {
+      lock.changedFrames = signatureDistance(lock.signature, signature) >= REMOVAL_DISTANCE ? lock.changedFrames + 1 : 0
+      if (lock.changedFrames < REMOVAL_FRAMES || Date.now() - lock.lockedAt < MIN_LOCK_MS) {
+        setPhase('scanning-next')
+        return
+      }
+      releasedRef.current = lock.pokemonId === null ? null : { pokemonId: lock.pokemonId, releasedAt: Date.now() }
+      lockRef.current = null
+      setPhase('scanning')
     }
 
     const loop = async () => {
@@ -127,9 +143,9 @@ export function useContinuousScanner({ videoRef, guideRef, active, recognition, 
         }
 
         const lock = lockRef.current
-        if (lock && signatureDistance(lock.signature, frame.signature) < STILL_SCENE_DISTANCE) {
-          setPhase('scanning-next')
-          await wait(350)
+        if (lock) {
+          watchRemoval(lock, frame.signature)
+          await wait(LOCKED_POLL_MS)
           continue
         }
 
@@ -156,6 +172,12 @@ export function useContinuousScanner({ videoRef, guideRef, active, recognition, 
     (pokemon: Pokemon | null, confidence = 1) => {
       setCandidates([])
       pausedRef.current = false
+      const lock = lockRef.current
+      if (lock) {
+        lock.lockedAt = Date.now()
+        lock.changedFrames = 0
+        lock.pokemonId = pokemon?.id ?? null
+      }
       if (pokemon) identify(pokemon, confidence)
       else setPhase('scanning-next')
     },
@@ -170,11 +192,13 @@ export function useContinuousScanner({ videoRef, guideRef, active, recognition, 
 
   const releaseLock = useCallback(() => {
     lockRef.current = null
+    releasedRef.current = null
   }, [])
 
   return {
     state,
     candidates,
+    confirmationReason,
     engineReady,
     engineProgress,
     engineError,

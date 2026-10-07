@@ -2,7 +2,7 @@ import { Check, CircleCheck, GripVertical, RotateCcw, TriangleAlert } from 'luci
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn, formatDexNumber } from '@/lib/format'
-import { outOfOrderItems, type SortGroup } from '@/services/sortingService'
+import { outOfOrderItems, type DeckCard, type SortGroup } from '@/services/sortingService'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/Primitives'
 import { PokemonImage } from '@/components/pokemon/PokemonImage'
@@ -12,10 +12,17 @@ type Mode = 'sequence' | 'check'
 
 interface SequenceViewProps {
   groups: SortGroup[]
-  currentIndex: number
+  deck: DeckCard[]
+  deckIndex: number
 }
 
-function MiniCard({ group, tone }: { group: SortGroup; tone: 'done' | 'current' | 'next' | 'table' | 'wrong' }) {
+interface MiniCardProps {
+  group: SortGroup
+  tone: 'done' | 'current' | 'next' | 'table' | 'wrong'
+  hideCount?: boolean
+}
+
+function MiniCard({ group, tone, hideCount = false }: MiniCardProps) {
   return (
     <div
       className={cn(
@@ -39,14 +46,14 @@ function MiniCard({ group, tone }: { group: SortGroup; tone: 'done' | 'current' 
           <Check className='h-3 w-3' strokeWidth={3.2} />
         </span>
       )}
-      {group.count > 1 && tone !== 'done' && (
+      {group.count > 1 && tone !== 'done' && !hideCount && (
         <span className='absolute top-1 right-1 rounded-full bg-ink-900 px-1.5 text-[9px] leading-4 font-bold text-white tabular'>×{group.count}</span>
       )}
     </div>
   )
 }
 
-export function SequenceView({ groups, currentIndex }: SequenceViewProps) {
+export function SequenceView({ groups, deck, deckIndex }: SequenceViewProps) {
   const [mode, setMode] = useState<Mode>('sequence')
   const reduceMotion = useReducedMotion()
   const currentRef = useRef<HTMLLIElement>(null)
@@ -62,7 +69,7 @@ export function SequenceView({ groups, currentIndex }: SequenceViewProps) {
 
   useEffect(() => {
     if (mode === 'sequence') currentRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' })
-  }, [currentIndex, mode, reduceMotion])
+  }, [deckIndex, mode, reduceMotion])
 
   const byDex = useMemo(() => new Map(groups.map((group) => [group.pokedexNumber, group])), [groups])
   const misplaced = useMemo(() => new Set(outOfOrderItems(tableOrder)), [tableOrder])
@@ -92,26 +99,29 @@ export function SequenceView({ groups, currentIndex }: SequenceViewProps) {
         value={mode}
         onChange={setMode}
         options={[
-          { value: 'sequence', label: 'Sequência completa' },
+          { value: 'sequence', label: 'Ordem do deck' },
           { value: 'check', label: 'Conferir mesa' },
         ]}
       />
 
       {mode === 'sequence' ? (
         <div className='felt -mx-4 flex flex-1 items-center rounded-none py-8 sm:mx-0 sm:rounded-[28px]'>
-          <ol className='no-scrollbar flex w-full snap-x items-center gap-2 overflow-x-auto px-[40vw] py-4 sm:px-[30%]' aria-label='Sequência pela Pokédex'>
-            {groups.map((group, position) => {
-              const tone = group.done ? 'done' : position === currentIndex ? 'current' : 'next'
+          <ol className='no-scrollbar flex w-full snap-x items-center gap-2 overflow-x-auto px-[40vw] py-4 sm:px-[30%]' aria-label='Cartas na ordem do deck'>
+            {deck.map((item) => {
+              const group = byDex.get(item.card.pokedexNumber)
+              if (!group) return null
+              const current = item.deckIndex === deckIndex
+              const tone = item.placed ? 'done' : current ? 'current' : 'next'
               return (
                 <motion.li
-                  key={group.pokedexNumber}
-                  ref={position === currentIndex ? currentRef : undefined}
+                  key={item.card.id}
+                  ref={current ? currentRef : undefined}
                   layout
                   className='flex shrink-0 snap-center items-center gap-2'
-                  aria-current={position === currentIndex ? 'step' : undefined}
+                  aria-current={current ? 'step' : undefined}
                 >
-                  <MiniCard group={group} tone={tone} />
-                  {position < groups.length - 1 && <span className='text-white/20' aria-hidden>→</span>}
+                  <MiniCard group={group} tone={tone} hideCount />
+                  {item.deckIndex < deck.length - 1 && <span className='text-white/20' aria-hidden>→</span>}
                 </motion.li>
               )
             })}

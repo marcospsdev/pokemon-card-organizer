@@ -9,12 +9,13 @@ import { PokemonImage } from '@/components/pokemon/PokemonImage'
 
 interface PokemonConfirmationProps {
   candidates: MatchCandidate[]
+  repeat?: boolean
   onConfirm: (pokemon: Pokemon, confidence: number) => void
   onSkip: () => void
   onManual: () => void
 }
 
-export function PokemonConfirmation({ candidates, onConfirm, onSkip, onManual }: PokemonConfirmationProps) {
+export function PokemonConfirmation({ candidates, repeat = false, onConfirm, onSkip, onManual }: PokemonConfirmationProps) {
   const [selection, setSelection] = useState({ candidates, index: 0 })
   const selected = selection.candidates === candidates ? selection.index : 0
   const setSelected = (index: number) => setSelection({ candidates, index })
@@ -27,8 +28,8 @@ export function PokemonConfirmation({ candidates, onConfirm, onSkip, onManual }:
       open={open}
       onClose={onSkip}
       tone='dark'
-      title='Não conseguimos identificar com certeza'
-      description='Você quis dizer:'
+      title={repeat ? `Outra carta de ${candidates[0]?.pokemon.displayName ?? ''}?` : 'Não conseguimos identificar com certeza'}
+      description={repeat ? 'Parece a mesma carta que acabou de ser registrada. Confirme só se for uma carta nova.' : 'Você quis dizer:'}
     >
       <div role='radiogroup' aria-label='Sugestões' className='flex flex-col gap-2'>
         {candidates.map((candidate, position) => {

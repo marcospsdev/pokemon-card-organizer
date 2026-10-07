@@ -235,6 +235,7 @@ export function ScannerPage() {
 
       <PokemonConfirmation
         candidates={scanner.candidates}
+        repeat={scanner.confirmationReason === 'repeat'}
         onConfirm={(pokemon, confidence) => scanner.resolveConfirmation(pokemon, confidence)}
         onSkip={() => scanner.resolveConfirmation(null)}
         onManual={() => {
