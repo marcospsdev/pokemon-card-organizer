@@ -1,11 +1,12 @@
-import { GalleryHorizontal, LayoutGrid, MapPin, Shapes, X } from 'lucide-react'
+import { Check, Copy, GalleryHorizontal, LayoutGrid, MapPin, Shapes, X } from 'lucide-react'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { TYPE_META, cn, formatDexNumber, normalizeText, regionLabel, typeMeta } from '@/lib/format'
+import { TYPE_META, cn, copyText, formatDexNumber, normalizeText, pluralize, regionLabel, typeMeta } from '@/lib/format'
 import { useOwnedCounts, usePokemonIndex } from '@/hooks/usePokemonData'
 import { useOrganizationsStore } from '@/store/organizationsStore'
+import { toast } from '@/store/toastStore'
 import type { Pokemon } from '@/types'
-import { Button } from '@/components/ui/Button'
+import { Button, IconButton } from '@/components/ui/Button'
 import { LargeTitle, SegmentedControl, TypeBadge } from '@/components/ui/Primitives'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { DepthCarousel } from '@/components/pokemon/DepthCarousel'
@@ -147,6 +148,23 @@ export function PokedexPage() {
   }, [query, matcher, regions, navigate, setParam])
 
   const ownedCount = owned.size
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+
+  const copyList = async () => {
+    const text = filtered.map((pokemon) => `${formatDexNumber(pokemon.nationalDexNumber)} ${pokemon.displayName}`).join('\n')
+    if (await copyText(text)) {
+      setCopied(true)
+      toast(pluralize(filtered.length, 'Pokémon copiado', 'Pokémon copiados'), { tone: 'success' })
+    } else {
+      toast('Não foi possível copiar a lista', { tone: 'error' })
+    }
+  }
 
   return (
     <div>
@@ -154,16 +172,26 @@ export function PokedexPage() {
         title='Pokédex'
         subtitle={list.length ? `Você possui ${ownedCount} de ${list.length}` : 'National Pokédex'}
         trailing={
-          <div className='w-[112px]'>
-            <SegmentedControl
-              label='Visualização'
-              value={view}
-              onChange={(value) => setParam('view', value === 'grid' ? null : value)}
-              options={[
-                { value: 'grid', label: '', icon: <LayoutGrid className='h-4 w-4' aria-label='Grade' /> },
-                { value: 'carousel', label: '', icon: <GalleryHorizontal className='h-4 w-4' aria-label='Carrossel' /> },
-              ]}
-            />
+          <div className='flex items-center gap-2'>
+            <IconButton
+              label={`Copiar lista (${pluralize(filtered.length, 'Pokémon', 'Pokémon')})`}
+              onClick={() => void copyList()}
+              disabled={filtered.length === 0}
+              className='disabled:opacity-40'
+            >
+              {copied ? <Check className='h-[18px] w-[18px] text-emerald-600' /> : <Copy className='h-[18px] w-[18px]' />}
+            </IconButton>
+            <div className='w-[112px]'>
+              <SegmentedControl
+                label='Visualização'
+                value={view}
+                onChange={(value) => setParam('view', value === 'grid' ? null : value)}
+                options={[
+                  { value: 'grid', label: '', icon: <LayoutGrid className='h-4 w-4' aria-label='Grade' /> },
+                  { value: 'carousel', label: '', icon: <GalleryHorizontal className='h-4 w-4' aria-label='Carrossel' /> },
+                ]}
+              />
+            </div>
           </div>
         }
       />

@@ -9,6 +9,29 @@ export function createId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+export async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    // Fallback para contextos sem Clipboard API (ex.: HTTP na rede local)
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      return document.execCommand('copy')
+    } catch {
+      return false
+    } finally {
+      textarea.remove()
+    }
+  }
+}
+
 export function formatDexNumber(value: number) {
   return `#${String(value).padStart(value > 999 ? 4 : 3, '0')}`
 }
