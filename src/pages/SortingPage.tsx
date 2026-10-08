@@ -2,6 +2,7 @@ import { Check, ChevronLeft, Minus, Plus, Undo2 } from 'lucide-react'
 import { LayoutGroup } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { cn } from '@/lib/format'
 import { usePokemonIndex, useSortPlan } from '@/hooks/usePokemonData'
 import { buildDeck, instructionFor, lastPlacedDeckIndex, nextDeckIndex, summarize } from '@/services/sortingService'
 import { useSettingsStore, vibrate } from '@/store/settingsStore'
@@ -14,6 +15,8 @@ import { SortingBoard } from '@/components/sorting/SortingBoard'
 import { SortingInstruction } from '@/components/sorting/SortingInstruction'
 
 type View = 'guided' | 'sequence'
+
+const CONTAINER = 'mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-10'
 
 export function SortingPage() {
   const { id } = useParams()
@@ -66,7 +69,7 @@ export function SortingPage() {
 
   return (
     <div className='fixed inset-0 z-40 flex flex-col bg-ink-900 text-white'>
-      <header className='flex items-center gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3'>
+      <header className={cn(CONTAINER, 'flex items-center gap-3 pt-[max(12px,env(safe-area-inset-top))] pb-3')}>
         <IconButton label='Voltar para o resumo' tone='dark' onClick={() => navigate(`/organizations/${id}`)}>
           <ChevronLeft className='h-5 w-5' />
         </IconButton>
@@ -81,7 +84,7 @@ export function SortingPage() {
         </div>
       </header>
 
-      <div className='px-4 pb-3'>
+      <div className={cn(CONTAINER, 'pb-3')}>
         <SegmentedControl
           label='Modo de organização'
           tone='dark'
@@ -96,7 +99,7 @@ export function SortingPage() {
 
       {view === 'guided' ? (
         <LayoutGroup>
-          <div className='flex min-h-0 flex-1 flex-col gap-4 px-4 lg:mx-auto lg:w-full lg:max-w-5xl lg:flex-row lg:gap-8'>
+          <div className={cn(CONTAINER, 'flex min-h-0 flex-1 flex-col gap-4 lg:flex-row lg:gap-8')}>
             <section className='shrink-0 lg:w-[420px] lg:pt-6' aria-label='Próxima carta'>
               {instruction ? (
                 <SortingInstruction
@@ -139,12 +142,12 @@ export function SortingPage() {
           </div>
         </LayoutGroup>
       ) : (
-        <div className='min-h-0 flex-1 overflow-y-auto px-4 pb-4 lg:mx-auto lg:w-full lg:max-w-5xl'>
+        <div className={cn(CONTAINER, 'min-h-0 flex-1 overflow-y-auto pb-4')}>
           <SequenceView groups={groups} deck={deck} deckIndex={deckIndex} />
         </div>
       )}
 
-      <footer className='flex items-center gap-3 border-t border-white/10 bg-ink-900/90 px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] lg:justify-center'>
+      <footer className='flex items-center gap-3 border-t border-white/10 bg-ink-900/90 px-4 sm:px-6 lg:px-10 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] lg:justify-center'>
         <Button variant='glass' size='lg' onClick={undo} disabled={!canUndo} icon={<Undo2 className='h-5 w-5' />} aria-label='Desfazer última carta'>
           <span className='hidden sm:inline'>Desfazer</span>
         </Button>
